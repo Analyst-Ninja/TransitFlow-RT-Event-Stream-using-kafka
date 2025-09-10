@@ -173,3 +173,8 @@ cython_debug/
 .ivy2
 .ivy2/
 .ivy2*
+
+# .DS_Store
+.DS_Store
+.DS_Store/
+.DS_Store*
