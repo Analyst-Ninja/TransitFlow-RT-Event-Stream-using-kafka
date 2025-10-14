@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - release
+      - epic/**
+    tags:
+      - "v*" # e.g., v1.0.0, v2.3.4
+      - "release-*" # e.g., release-2025.01
+  pull_request:
+    branches:
+      - main
+      - develop
+      - release
+      - epic/**
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # Needed for complete commit history for SonarQube
+
+      - uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=transit-flow
+            -Dsonar.projectName=transit-flow
+            -Dsonar.sources=.
+
+      # Optional: Fail job if Quality Gate fails V2
+      - uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
