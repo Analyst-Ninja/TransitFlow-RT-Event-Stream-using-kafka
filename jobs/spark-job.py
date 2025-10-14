@@ -4,7 +4,6 @@ from pyspark.sql.types import (
     StructField,
     StringType,
     IntegerType,
-    FloatType,
     TimestampType,
     DoubleType,
 )
@@ -42,7 +41,7 @@ def main():
     spark.sparkContext.setLogLevel("WARN")
 
     # Vehicle Schema
-    vehicleSchema = StructType(
+    vehicle_schema = StructType(
         [
             StructField("id", StringType(), True),
             StructField("deviceId", StringType(), True),
@@ -58,7 +57,7 @@ def main():
     )
 
     # GPS Schema
-    gpsSchema = StructType(
+    gps_schema = StructType(
         [
             StructField("id", StringType(), True),
             StructField("deviceId", StringType(), True),
@@ -70,7 +69,7 @@ def main():
     )
 
     # Traffic Schema
-    trafficSchema = StructType(
+    traffic_schema = StructType(
         [
             StructField("id", StringType(), True),
             StructField("deviceId", StringType(), True),
@@ -82,7 +81,7 @@ def main():
     )
 
     # Weather Data Schema
-    weatherSchema = StructType(
+    weather_schema = StructType(
         [
             StructField("id", StringType(), True),
             StructField("deviceId", StringType(), True),
@@ -98,7 +97,7 @@ def main():
     )
 
     # Emergency Schema
-    emergencySchema = StructType(
+    emergency_schema = StructType(
         [
             StructField("id", StringType(), True),
             StructField("deviceId", StringType(), True),
@@ -125,55 +124,56 @@ def main():
             .withWatermark("timestamp", "2 minutes")
         )
 
-    def streamWriter(DataFrame, checkpointFolder, output):
+    def stream_writer(df, checkpoint_folder, output):
         return (
-            DataFrame.writeStream.format("parquet")
-            .option("checkpointLocation", checkpointFolder)
+            df.writeStream.format("parquet")
+            .option("checkpointLocation", checkpoint_folder)
             .option("path", output)
             .outputMode("append")
             .start()
         )
 
-    vehicleDF = read_kafka_topic("vehicle_data", vehicleSchema).alias("vehicle")
-    gpsDF = read_kafka_topic("gps_data", gpsSchema).alias("gps")
-    weatherDF = read_kafka_topic("weather_data", weatherSchema).alias("weather")
-    trafficDF = read_kafka_topic("traffic_data", trafficSchema).alias("traffic")
-    emergencyDF = read_kafka_topic("emergency_data", emergencySchema).alias("emergency")
+    vehicle_df = read_kafka_topic("vehicle_data", vehicle_schema).alias("vehicle")
+    gps_df = read_kafka_topic("gps_data", gps_schema).alias("gps")
+    weather_df = read_kafka_topic("weather_data", weather_schema).alias("weather")
+    traffic_df = read_kafka_topic("traffic_data", traffic_schema).alias("traffic")
+    emergency_df = read_kafka_topic("emergency_data", emergency_schema).alias(
+        "emergency"
+    )
 
     # Join all the DF with id and timestamp
     # joinDF
 
-    query1 = streamWriter(
-        vehicleDF,
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/vehicle_data",
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/vehicle_data",
-    )
+    queries = [
+        stream_writer(
+            vehicle_df,
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/vehicle_data",
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/vehicle_data",
+        ),
+        stream_writer(
+            gps_df,
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/gps_data",
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/gps_data",
+        ),
+        stream_writer(
+            weather_df,
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/weather_data",
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/weather_data",
+        ),
+        stream_writer(
+            traffic_df,
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/traffic_data",
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/traffic_data",
+        ),
+        stream_writer(
+            emergency_df,
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/emergency_data",
+            f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/emergency_data",
+        ),
+    ]
 
-    query2 = streamWriter(
-        gpsDF,
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/gps_data",
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/gps_data",
-    )
-
-    query3 = streamWriter(
-        weatherDF,
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/weather_data",
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/weather_data",
-    )
-
-    query4 = streamWriter(
-        trafficDF,
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/traffic_data",
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/traffic_data",
-    )
-
-    query5 = streamWriter(
-        emergencyDF,
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/checkpoints/emergency_data",
-        f"s3a://{os.getenv('S3_BUCKET_NAME')}/{os.getenv('S3_PRFEIX')}/data/emergency_data",
-    )
-
-    query5.awaitTermination()
+    for q in queries:
+        q.awaitTermination()
 
 
 if __name__ == "__main__":
